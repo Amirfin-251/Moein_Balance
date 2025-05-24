@@ -36,6 +36,9 @@ CB_DEAL_DIRECTION = "dir_"
 CB_DEAL_TYPE = "dealtype_"
 CB_EDIT_FIELD = "field_"
 CB_EDIT_VALUE = "edit_value_"
+CB_PARTNER_NAME = "partner_"
+CB_BUY_PARTNER = "buy_partner_"
+CB_SELL_PARTNER = "sell_partner_"
 
 # Define persistent menu that will always be available
 MENU_KEYBOARD = ReplyKeyboardMarkup([
@@ -117,6 +120,97 @@ def get_last_number_from_other_sheet(cell: str) -> str:
     spreadsheet = client.open("Test")
     worksheet_toread = spreadsheet.worksheet("GreenLand")  # Change to your worksheet name
     return worksheet_toread.acell(cell).value
+
+# Add these functions to fetch and update partner names
+
+def get_partner_names_from_sheet():
+    """Fetch partner names from the GreenLand worksheet."""
+    try:
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        # Check if we're using environment variable for credentials
+        if 'GOOGLE_API_KEY' in os.environ:
+            import json
+            # Parse JSON from environment variable
+            credentials_dict = json.loads(os.environ['GOOGLE_API_KEY'])
+            credentials = ServiceAccountCredentials.from_json_keyfile_dict(credentials_dict, scope)
+        else:
+            # Use local file path (your original code)
+            credentials = ServiceAccountCredentials.from_json_keyfile_name(
+                os.getenv('GOOGLE_API_KEY'), scope)
+        
+        client = gspread.authorize(credentials)
+        spreadsheet = client.open("Test")
+        worksheet = spreadsheet.worksheet("GreenLand")
+        
+        # Get all values from the "نام مشتری" column
+        # Assuming it's in column D (index 3)
+        try:
+            partner_column = worksheet.col_values(4)  # Adjust index if needed
+            # Remove header and empty values
+            if partner_column and len(partner_column) > 0:
+                partner_names = [name for name in partner_column[1:] if name.strip()]
+                return partner_names
+            return []
+        except Exception as e:
+            logger.error(f"Error fetching partner names: {e}")
+            return []
+    except Exception as e:
+        logger.error(f"Error connecting to sheet: {e}")
+        return []
+
+def add_partner_name_to_sheet(name):
+    """Add a new partner name to the GreenLand worksheet."""
+    try:
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        # Check if we're using environment variable for credentials
+        if 'GOOGLE_API_KEY' in os.environ:
+            import json
+            # Parse JSON from environment variable
+            credentials_dict = json.loads(os.environ['GOOGLE_API_KEY'])
+            credentials = ServiceAccountCredentials.from_json_keyfile_dict(credentials_dict, scope)
+        else:
+            # Use local file path (your original code)
+            credentials = ServiceAccountCredentials.from_json_keyfile_name(
+                os.getenv('GOOGLE_API_KEY'), scope)
+        
+        client = gspread.authorize(credentials)
+        spreadsheet = client.open("Test")
+        worksheet = spreadsheet.worksheet("GreenLand")
+        
+        # Find the "نام مشتری" column
+        # Assuming it's in column D (index 3)
+        try:
+            partner_column = worksheet.col_values(4)  # Adjust index if needed
+            
+            # Check if name already exists
+            if name in partner_column:
+                return False
+            
+            # Find the first empty cell in the column
+            next_row = len(partner_column) + 1
+            worksheet.update_cell(next_row, 4, name)  # Adjust column index if needed
+            return True
+        except Exception as e:
+            logger.error(f"Error adding partner name: {e}")
+            return False
+    except Exception as e:
+        logger.error(f"Error connecting to sheet: {e}")
+        return False
+
+def create_partner_buttons(partner_names, prefix):
+    """Create inline keyboard buttons for partner names."""
+    keyboard = []
+    # Show partners in rows of 2
+    for i in range(0, len(partner_names), 2):
+        row = [InlineKeyboardButton(partner_names[i], callback_data=f"{prefix}{partner_names[i]}")]
+        if i + 1 < len(partner_names):
+            row.append(InlineKeyboardButton(partner_names[i+1], callback_data=f"{prefix}{partner_names[i+1]}"))
+        keyboard.append(row)
+    
+    # Add button to enter custom name
+    keyboard.append([InlineKeyboardButton("➕ افزودن نام جدید", callback_data=f"{prefix}ADD_NEW")])
+    
+    return keyboard
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Send welcome message with a single start button."""
@@ -323,16 +417,123 @@ async def weight(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text("طرف حساب را وارد کنید:")
     return PARTNER_NAME
 
-async def partner_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Process partner name and ask for description."""
-    # Ignore menu commands
-    if update.message.text in ["🆕 تراکنش جدید", "🏠 بازگشت به صفحه اصلی", "❌ انصراف"]:
-        return
-
-    context.user_data["transaction"]["partner_name"] = update.message.text
+async def show_partner_selection(update: Update, context: ContextTypes.DEFAULT_TYPE, title: str, callback_prefix: str, next_state: int) -> int:
+    """Show partner selection buttons."""
+    partner_names = get_partner_names_from_sheet()
     
-    await update.message.reply_text("توضیحات را وارد کنید (اختیاری):")
-    return DESCRIPTION
+    if not partner_names:
+        # If no partners found, go directly to text input
+        if update.callback_query:
+            await update.callback_query.message.reply_text(f"{title} را وارد کنید:")
+        else:
+            await update.message.reply_text(f"{title} را وارد کنید:")
+        context.user_data["current_partner_field"] = title
+        context.user_data["next_state"] = next_state
+        return next_state
+    
+    # Create buttons with partner names
+    keyboard = create_partner_buttons(partner_names, callback_prefix)
+    
+    if update.callback_query:
+        await update.callback_query.message.reply_text(
+            f"{title} را انتخاب کنید یا نام جدید اضافه کنید:",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    else:
+        await update.message.reply_text(
+            f"{title} را انتخاب کنید یا نام جدید اضافه کنید:",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    
+    context.user_data["current_partner_field"] = title
+    context.user_data["next_state"] = next_state
+    return next_state
+
+async def handle_partner_selection(update: Update, context: ContextTypes.DEFAULT_TYPE, field_name: str) -> int:
+    """Handle partner selection from buttons."""
+    query = update.callback_query
+    await query.answer()
+    
+    callback_data = query.data
+    
+    # Determine which prefix we're dealing with
+    prefix = ""
+    if callback_data.startswith(CB_PARTNER_NAME):
+        prefix = CB_PARTNER_NAME
+    elif callback_data.startswith(CB_BUY_PARTNER):
+        prefix = CB_BUY_PARTNER
+    elif callback_data.startswith(CB_SELL_PARTNER):
+        prefix = CB_SELL_PARTNER
+    
+    selection = callback_data.replace(prefix, "")
+    
+    if selection == "ADD_NEW":
+        # User wants to add a new partner
+        await query.message.reply_text(f"لطفا {context.user_data['current_partner_field']} جدید را وارد کنید:")
+        context.user_data["adding_new_partner"] = True
+        return context.user_data["next_state"]
+    else:
+        # User selected an existing partner
+        context.user_data["transaction"][field_name] = selection
+        
+        # Determine next state based on the transaction flow
+        if field_name == "partner_name":
+            await query.message.reply_text("توضیحات را وارد کنید (اختیاری):")
+            return DESCRIPTION
+        elif field_name == "buy_partner_name":
+            return await show_partner_selection(
+                update, context, 
+                "به چه کسی پرداخت می کنید؟", 
+                CB_SELL_PARTNER, 
+                SELL_PARTNER_NAME
+            )
+        elif field_name == "sell_partner_name":
+            await query.message.reply_text("توضیحات را وارد کنید (اختیاری):")
+            return DESCRIPTION
+        
+async def partner_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Process partner name input or show partner selection."""
+    # If this is a text message and we were adding a new partner
+    if update.message and context.user_data.get("adding_new_partner"):
+        # Ignore menu commands
+        if update.message.text in ["🆕 تراکنش جدید", "🏠 بازگشت به صفحه اصلی", "❌ انصراف"]:
+            return
+        
+        new_partner = update.message.text
+        context.user_data["transaction"]["partner_name"] = new_partner
+        
+        # Add the new partner to the sheet
+        success = add_partner_name_to_sheet(new_partner)
+        if success:
+            await update.message.reply_text(f"نام '{new_partner}' به لیست مشتریان اضافه شد.")
+        
+        # Clear the flag
+        context.user_data["adding_new_partner"] = False
+        
+        # Continue to description
+        await update.message.reply_text("توضیحات را وارد کنید (اختیاری):")
+        return DESCRIPTION
+    
+    # If this is a fresh request, show partner selection
+    elif update.message and not context.user_data.get("adding_new_partner"):
+        # Ignore menu commands
+        if update.message.text in ["🆕 تراکنش جدید", "🏠 بازگشت به صفحه اصلی", "❌ انصراف"]:
+            return
+            
+        # This is a direct text entry without selecting from the list
+        context.user_data["transaction"]["partner_name"] = update.message.text
+        
+        # Continue to description
+        await update.message.reply_text("توضیحات را وارد کنید (اختیاری):")
+        return DESCRIPTION
+    
+    # Initial partner name request - show selection buttons
+    return await show_partner_selection(
+        update, context, 
+        "طرف حساب", 
+        CB_PARTNER_NAME, 
+        PARTNER_NAME
+    )
 
 async def handle_deal_direction_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Process deal direction from callback."""
@@ -396,30 +597,109 @@ async def rate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     context.user_data["transaction"]["rate"] = update.message.text
     
-    await update.message.reply_text("طرف حساب را وارد کنید")
-    return PARTNER_NAME
+    # Show partner selection instead of asking for text input
+    return await show_partner_selection(
+        update, context, 
+        "طرف حساب", 
+        CB_PARTNER_NAME, 
+        PARTNER_NAME
+    )
 
 async def buy_partner_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Process buy partner name for Bill transactions."""
-    # Ignore menu commands
-    if update.message.text in ["🆕 تراکنش جدید", "🏠 بازگشت به صفحه اصلی", "❌ انصراف"]:
-        return
-
-    context.user_data["transaction"]["buy_partner_name"] = update.message.text
+    """Process buy partner name input or show partner selection."""
+    # If this is a text message and we were adding a new partner
+    if update.message and context.user_data.get("adding_new_partner"):
+        # Ignore menu commands
+        if update.message.text in ["🆕 تراکنش جدید", "🏠 بازگشت به صفحه اصلی", "❌ انصراف"]:
+            return
+        
+        new_partner = update.message.text
+        context.user_data["transaction"]["buy_partner_name"] = new_partner
+        
+        # Add the new partner to the sheet
+        success = add_partner_name_to_sheet(new_partner)
+        if success:
+            await update.message.reply_text(f"نام '{new_partner}' به لیست مشتریان اضافه شد.")
+        
+        # Clear the flag
+        context.user_data["adding_new_partner"] = False
+        
+        # Continue to sell partner name
+        return await show_partner_selection(
+            update, context, 
+            "به چه کسی پرداخت می کنید؟", 
+            CB_SELL_PARTNER, 
+            SELL_PARTNER_NAME
+        )
     
-    await update.message.reply_text("به چه کسی پرداخت می کنید؟")
-    return SELL_PARTNER_NAME
+    # If this is a fresh request, show partner selection
+    elif update.message and not context.user_data.get("adding_new_partner"):
+        # Ignore menu commands
+        if update.message.text in ["🆕 تراکنش جدید", "🏠 بازگشت به صفحه اصلی", "❌ انصراف"]:
+            return
+            
+        # This is a direct text entry without selecting from the list
+        context.user_data["transaction"]["buy_partner_name"] = update.message.text
+        
+        # Continue to sell partner name
+        return await show_partner_selection(
+            update, context, 
+            "به چه کسی پرداخت می کنید؟", 
+            CB_SELL_PARTNER, 
+            SELL_PARTNER_NAME
+        )
+    
+    # Initial buy partner name request - show selection buttons
+    return await show_partner_selection(
+        update, context, 
+        "از چه کسی دریافت می کنید؟", 
+        CB_BUY_PARTNER, 
+        BUY_PARTNER_NAME
+    )
 
 async def sell_partner_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Process sell partner name for Bill transactions."""
-    # Ignore menu commands
-    if update.message.text in ["🆕 تراکنش جدید", "🏠 بازگشت به صفحه اصلی", "❌ انصراف"]:
-        return
-
-    context.user_data["transaction"]["sell_partner_name"] = update.message.text
+    """Process sell partner name input or show partner selection."""
+    # If this is a text message and we were adding a new partner
+    if update.message and context.user_data.get("adding_new_partner"):
+        # Ignore menu commands
+        if update.message.text in ["🆕 تراکنش جدید", "🏠 بازگشت به صفحه اصلی", "❌ انصراف"]:
+            return
+        
+        new_partner = update.message.text
+        context.user_data["transaction"]["sell_partner_name"] = new_partner
+        
+        # Add the new partner to the sheet
+        success = add_partner_name_to_sheet(new_partner)
+        if success:
+            await update.message.reply_text(f"نام '{new_partner}' به لیست مشتریان اضافه شد.")
+        
+        # Clear the flag
+        context.user_data["adding_new_partner"] = False
+        
+        # Continue to description
+        await update.message.reply_text("توضیحات را وارد کنید (اختیاری):")
+        return DESCRIPTION
     
-    await update.message.reply_text("توضیحات را وارد کنید (اختیاری):")
-    return DESCRIPTION
+    # If this is a fresh request, show partner selection
+    elif update.message and not context.user_data.get("adding_new_partner"):
+        # Ignore menu commands
+        if update.message.text in ["🆕 تراکنش جدید", "🏠 بازگشت به صفحه اصلی", "❌ انصراف"]:
+            return
+            
+        # This is a direct text entry without selecting from the list
+        context.user_data["transaction"]["sell_partner_name"] = update.message.text
+        
+        # Continue to description
+        await update.message.reply_text("توضیحات را وارد کنید (اختیاری):")
+        return DESCRIPTION
+    
+    # Initial sell partner name request - show selection buttons
+    return await show_partner_selection(
+        update, context, 
+        "به چه کسی پرداخت می کنید؟", 
+        CB_SELL_PARTNER, 
+        SELL_PARTNER_NAME
+    )
 
 async def description(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Process description and show summary for confirmation."""
@@ -737,6 +1017,10 @@ def main() -> None:
                 MessageHandler(filters.Regex("^🆕 تراکنش جدید$"), new_transaction)
             ],
             PARTNER_NAME: [
+                CallbackQueryHandler(
+                    lambda u, c: handle_partner_selection(u, c, "partner_name"), 
+                    pattern=f"^{CB_PARTNER_NAME}"
+                ),
                 MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.Regex("^(❌ انصراف|🏠 بازگشت به صفحه اصلی|🆕 تراکنش جدید)$"), partner_name),
                 MessageHandler(filters.Regex("^(❌ انصراف|🏠 بازگشت به صفحه اصلی)$"), handle_main_menu),
                 MessageHandler(filters.Regex("^🆕 تراکنش جدید$"), new_transaction)
@@ -762,11 +1046,19 @@ def main() -> None:
                 MessageHandler(filters.Regex("^🆕 تراکنش جدید$"), new_transaction)
             ],
             BUY_PARTNER_NAME: [
+                CallbackQueryHandler(
+                    lambda u, c: handle_partner_selection(u, c, "buy_partner_name"), 
+                    pattern=f"^{CB_BUY_PARTNER}"
+                ),
                 MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.Regex("^(❌ انصراف|🏠 بازگشت به صفحه اصلی|🆕 تراکنش جدید)$"), buy_partner_name),
                 MessageHandler(filters.Regex("^(❌ انصراف|🏠 بازگشت به صفحه اصلی)$"), handle_main_menu),
                 MessageHandler(filters.Regex("^🆕 تراکنش جدید$"), new_transaction)
             ],
-            SELL_PARTNER_NAME: [
+             SELL_PARTNER_NAME: [
+                CallbackQueryHandler(
+                    lambda u, c: handle_partner_selection(u, c, "sell_partner_name"), 
+                    pattern=f"^{CB_SELL_PARTNER}"
+                ),
                 MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.Regex("^(❌ انصراف|🏠 بازگشت به صفحه اصلی|🆕 تراکنش جدید)$"), sell_partner_name),
                 MessageHandler(filters.Regex("^(❌ انصراف|🏠 بازگشت به صفحه اصلی)$"), handle_main_menu),
                 MessageHandler(filters.Regex("^🆕 تراکنش جدید$"), new_transaction)
