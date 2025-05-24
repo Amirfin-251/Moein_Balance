@@ -141,19 +141,34 @@ def get_partner_names_from_sheet():
         client = gspread.authorize(credentials)
         spreadsheet = client.open("Test")
         worksheet = spreadsheet.worksheet("GreenLand")
+        # Find the column by header name instead of assuming position
+        headers = worksheet.row_values(1)
         
-        # Get all values from the "نام مشتری" column
-        # Assuming it's in column D (index 3)
         try:
-            partner_column = worksheet.col_values(4)  # Adjust index if needed
-            # Remove header and empty values
-            if partner_column and len(partner_column) > 0:
+            # Find column index for "نام مشتری"
+            header_index = headers.index("نام مشتری") + 1  # Convert to 1-based index for gspread
+            
+            # If found, get values from that column
+            if header_index:
+                partner_column = worksheet.col_values(header_index)
+                # Remove header and empty values
                 partner_names = [name for name in partner_column[1:] if name.strip()]
+                
+                # Add logging to help debug
+                logger.info(f"Found {len(partner_names)} partner names: {partner_names[:5]}...")
                 return partner_names
+            else:
+                logger.error(f"Header 'نام مشتری' not found in worksheet. Available headers: {headers}")
+                return []
+        except ValueError:
+            logger.error(f"Header 'نام مشتری' not found in worksheet. Available headers: {headers}")
             return []
         except Exception as e:
             logger.error(f"Error fetching partner names: {e}")
             return []
+    except gspread.exceptions.WorksheetNotFound:
+        logger.error(f"Worksheet 'Green land' not found. Please check the name.")
+        return []
     except Exception as e:
         logger.error(f"Error connecting to sheet: {e}")
         return []
@@ -414,14 +429,23 @@ async def weight(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     context.user_data["transaction"]["weight"] = update.message.text
     
-    await update.message.reply_text("طرف حساب را وارد کنید:")
-    return PARTNER_NAME
+    # Explicitly call show_partner_selection instead of just asking for input
+    return await show_partner_selection(
+        update, context, 
+        "طرف حساب", 
+        CB_PARTNER_NAME, 
+        PARTNER_NAME
+    )
 
 async def show_partner_selection(update: Update, context: ContextTypes.DEFAULT_TYPE, title: str, callback_prefix: str, next_state: int) -> int:
-    """Show partner selection buttons."""
+    """Show partner selection buttons with debugging."""
+    logger.info(f"Fetching partner names for {title}")
     partner_names = get_partner_names_from_sheet()
     
+    logger.info(f"Found {len(partner_names)} partner names")
+    
     if not partner_names:
+        logger.warning("No partner names found in sheet")
         # If no partners found, go directly to text input
         if update.callback_query:
             await update.callback_query.message.reply_text(f"{title} را وارد کنید:")
@@ -433,17 +457,22 @@ async def show_partner_selection(update: Update, context: ContextTypes.DEFAULT_T
     
     # Create buttons with partner names
     keyboard = create_partner_buttons(partner_names, callback_prefix)
+    logger.info(f"Created keyboard with {len(keyboard)} rows")
     
-    if update.callback_query:
-        await update.callback_query.message.reply_text(
-            f"{title} را انتخاب کنید یا نام جدید اضافه کنید:",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-    else:
-        await update.message.reply_text(
-            f"{title} را انتخاب کنید یا نام جدید اضافه کنید:",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+    try:
+        if update.callback_query:
+            await update.callback_query.message.reply_text(
+                f"{title} را انتخاب کنید یا نام جدید اضافه کنید:",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+        else:
+            await update.message.reply_text(
+                f"{title} را انتخاب کنید یا نام جدید اضافه کنید:",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+        logger.info("Successfully sent partner selection message")
+    except Exception as e:
+        logger.error(f"Error sending partner selection: {e}")
     
     context.user_data["current_partner_field"] = title
     context.user_data["next_state"] = next_state
@@ -586,8 +615,14 @@ async def amount(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return RATE
     
     elif context.user_data["transaction"]["type"] == "حواله":
-        await update.message.reply_text("از چه کسی دریافت می کنید؟")
-        return BUY_PARTNER_NAME
+        logger.info("Bill transaction, now showing buy partner selection")
+        # Show buy partner selection
+        return await show_partner_selection(
+            update, context, 
+            "از چه کسی دریافت می کنید؟", 
+            CB_BUY_PARTNER, 
+            BUY_PARTNER_NAME
+        )
 
 async def rate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Process rate for Deal transactions."""
@@ -596,6 +631,7 @@ async def rate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return
 
     context.user_data["transaction"]["rate"] = update.message.text
+    logger.info("Rate processed, now showing partner selection")
     
     # Show partner selection instead of asking for text input
     return await show_partner_selection(
