@@ -847,7 +847,7 @@ async def confirmation_callback(update: Update, context: ContextTypes.DEFAULT_TY
             worksheet = setup_google_sheets()
             
             # Get headers from the first row
-            headers = worksheet.row_values(1)
+            # headers = worksheet.row_values(1)
             
             # Prepare the data as a dictionary
             transaction = context.user_data["transaction"]
