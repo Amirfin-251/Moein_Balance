@@ -350,7 +350,7 @@ async def handle_transaction_type_callback(update: Update, context: ContextTypes
         inline_keyboard = [
             [
                 InlineKeyboardButton("AED", callback_data=f"{CB_DEAL_TYPE}AED"),
-                InlineKeyboardButton("Million", callback_data=f"{CB_DEAL_TYPE}Million")
+                InlineKeyboardButton("Milion", callback_data=f"{CB_DEAL_TYPE}Milion")
             ],
             [
                 InlineKeyboardButton("Gold gr", callback_data=f"{CB_DEAL_TYPE}Gold gr"),
@@ -581,7 +581,7 @@ async def handle_deal_direction_callback(update: Update, context: ContextTypes.D
     inline_keyboard = [
         [
             InlineKeyboardButton("AED", callback_data=f"{CB_DEAL_TYPE}AED"),
-            InlineKeyboardButton("Gold Million", callback_data=f"{CB_DEAL_TYPE}Gold Million")
+            InlineKeyboardButton("Gold Milion", callback_data=f"{CB_DEAL_TYPE}Gold Milion")
         ],
         [
             InlineKeyboardButton("Gold gr", callback_data=f"{CB_DEAL_TYPE}Gold gr"),
@@ -954,7 +954,7 @@ async def edit_field_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
             f"لطفا مقدار جدید برای {field} را انتخاب کنید:",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("Gold gr", callback_data=f"{CB_EDIT_VALUE}Gold gr")],
-                [InlineKeyboardButton("Gold Million", callback_data=f"{CB_EDIT_VALUE}Gold Million")],
+                [InlineKeyboardButton("Gold Milion", callback_data=f"{CB_EDIT_VALUE}Gold Milion")],
                 [InlineKeyboardButton("AED", callback_data=f"{CB_EDIT_VALUE}AED")],
                 [InlineKeyboardButton("USD", callback_data=f"{CB_EDIT_VALUE}USD")]
             ])
