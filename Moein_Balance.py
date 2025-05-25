@@ -232,6 +232,20 @@ def create_partner_buttons(partner_names, prefix):
     
     return keyboard
 
+def to_english_number(s):
+    """Convert Persian/Arabic digits in a string to English digits."""
+    if not isinstance(s, str):
+        return s
+    persian_digits = '۰۱۲۳۴۵۶۷۸۹'
+    arabic_digits = '٠١٢٣٤٥٦٧٨٩'
+    english_digits = '0123456789'
+    table = {}
+    for p, e in zip(persian_digits, english_digits):
+        table[ord(p)] = e
+    for a, e in zip(arabic_digits, english_digits):
+        table[ord(a)] = e
+    return s.translate(table)
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Send welcome message with a single start button."""
     # Clear any existing data
@@ -375,7 +389,7 @@ async def receipt_num(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     if update.message.text in ["🆕 تراکنش جدید", "🏠 بازگشت به صفحه اصلی", "❌ انصراف"]:
         return
 
-    context.user_data["transaction"]["receipt_num"] = update.message.text
+    context.user_data["transaction"]["receipt_num"] = to_english_number(update.message.text)
     
     if context.user_data["transaction"]["type"] == "دریافت":
         await update.message.reply_text("شماره پاکت را وارد کنید:")
@@ -402,7 +416,7 @@ async def pack_num(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if update.message.text in ["🆕 تراکنش جدید", "🏠 بازگشت به صفحه اصلی", "❌ انصراف"]:
         return
 
-    context.user_data["transaction"]["pack_num"] = update.message.text
+    context.user_data["transaction"]["pack_num"] = to_english_number(update.message.text)
     await update.message.reply_text("اسم ریگیری را وارد کنید:")
     return ID_NUM
 
@@ -412,7 +426,7 @@ async def id_num(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if update.message.text in ["🆕 تراکنش جدید", "🏠 بازگشت به صفحه اصلی", "❌ انصراف"]:
         return
 
-    context.user_data["transaction"]["id_num"] = update.message.text
+    context.user_data["transaction"]["id_num"] = to_english_number(update.message.text)
     await update.message.reply_text("عیار را وارد کنید:")
     return PURITY
 
@@ -422,7 +436,7 @@ async def purity(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if update.message.text in ["🆕 تراکنش جدید", "🏠 بازگشت به صفحه اصلی", "❌ انصراف"]:
         return
 
-    context.user_data["transaction"]["purity"] = update.message.text
+    context.user_data["transaction"]["purity"] = to_english_number(update.message.text)
     await update.message.reply_text("وزن را وارد کنید:")
     return WEIGHT
 
@@ -432,7 +446,7 @@ async def weight(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if update.message.text in ["🆕 تراکنش جدید", "🏠 بازگشت به صفحه اصلی", "❌ انصراف"]:
         return
 
-    context.user_data["transaction"]["weight"] = update.message.text
+    context.user_data["transaction"]["weight"] = to_english_number(update.message.text)
     
     # Explicitly call show_partner_selection instead of just asking for input
     return await show_partner_selection(
@@ -613,7 +627,7 @@ async def amount(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if update.message.text in ["🆕 تراکنش جدید", "🏠 بازگشت به صفحه اصلی", "❌ انصراف"]:
         return
 
-    context.user_data["transaction"]["amount"] = update.message.text
+    context.user_data["transaction"]["amount"] = to_english_number(update.message.text)
     
     if context.user_data["transaction"]["type"] == "معامله":
         await update.message.reply_text("نرخ را وارد کنید:")
@@ -635,7 +649,7 @@ async def rate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if update.message.text in ["🆕 تراکنش جدید", "🏠 بازگشت به صفحه اصلی", "❌ انصراف"]:
         return
 
-    context.user_data["transaction"]["rate"] = update.message.text
+    context.user_data["transaction"]["rate"] = to_english_number(update.message.text)
     logger.info("Rate processed, now showing partner selection")
     
     # Show partner selection instead of asking for text input
@@ -973,6 +987,10 @@ async def edit_value(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     new_value = update.message.text
     field = context.user_data["edit_field"]
+    # If the field is numeric, convert to English digits
+    numeric_fields = ["شماره سند", "شماره پاکت", "عیار", "وزن", "مقدار", "نرخ"]
+    if field in numeric_fields:
+        new_value = to_english_number(new_value)
     
     # Update the value in user_data
     data_key = FIELD_MAPPING.get(field)
