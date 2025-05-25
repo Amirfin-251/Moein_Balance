@@ -19,14 +19,14 @@ load_dotenv()
 
 # Define conversation states
 (TRANSACTION_TYPE, RECEIPT_NUM, PACK_NUM, ID_NUM, PURITY, WEIGHT, PARTNER_NAME,
- DEAL_DIRECTION, DEAL_TYPE, AMOUNT, RATE, BUY_PARTNER_NAME, SELL_PARTNER_NAME,
+ DEAL_DIRECTION, DEAL_TYPE, AMOUNT, RATE, GIVER_PARTNER_NAME, RECEIVER_PARTNER_NAME,
  DESCRIPTION, CONFIRMATION, EDIT_FIELD, EDIT_VALUE, MAIN_MENU) = range(18)
 
 # Define column headers for Google Sheets
 HEADERS = [
     "نوع تراکنش", "تاریخ", "شماره سند", "شماره پاکت", "اسم ریگیری", 
     "عیار", "وزن", "طرف حساب", "جهت معامله", "نوع معامله", 
-    "مقدار", "نرخ", "طرف خریدار", "طرف فروشنده", 
+    "مقدار", "نرخ", "طرف پرداخت کننده", "طرف دریافت کننده", 
     "توضیحات", "زمان ثبت"
 ]
 
@@ -37,8 +37,8 @@ CB_DEAL_TYPE = "dealtype_"
 CB_EDIT_FIELD = "field_"
 CB_EDIT_VALUE = "edit_value_"
 CB_PARTNER_NAME = "partner_"
-CB_BUY_PARTNER = "buy_partner_"
-CB_SELL_PARTNER = "sell_partner_"
+CB_GIVER_PARTNER = "giver_partner_"
+CB_RECEIVER_PARTNER = "receiver_partner_"
 
 # Define persistent menu that will always be available
 MENU_KEYBOARD = ReplyKeyboardMarkup([
@@ -58,8 +58,8 @@ FIELD_MAPPING = {
     "نوع معامله": "deal_type",
     "مقدار": "amount",
     "نرخ": "rate",
-    "طرف خریدار": "buy_partner_name",
-    "طرف فروشنده": "sell_partner_name",
+    "طرف پرداخت کننده": "giver_partner_name",
+    "طرف دریافت کننده": "receiver_partner_name",
     "توضیحات": "description"
 }
 
@@ -494,10 +494,10 @@ async def handle_partner_selection(update: Update, context: ContextTypes.DEFAULT
     prefix = ""
     if callback_data.startswith(CB_PARTNER_NAME):
         prefix = CB_PARTNER_NAME
-    elif callback_data.startswith(CB_BUY_PARTNER):
-        prefix = CB_BUY_PARTNER
-    elif callback_data.startswith(CB_SELL_PARTNER):
-        prefix = CB_SELL_PARTNER
+    elif callback_data.startswith(CB_GIVER_PARTNER):
+        prefix = CB_GIVER_PARTNER
+    elif callback_data.startswith(CB_RECEIVER_PARTNER):
+        prefix = CB_RECEIVER_PARTNER
     
     selection = callback_data.replace(prefix, "")
     
@@ -514,14 +514,14 @@ async def handle_partner_selection(update: Update, context: ContextTypes.DEFAULT
         if field_name == "partner_name":
             await query.message.reply_text("توضیحات را وارد کنید (اختیاری):")
             return DESCRIPTION
-        elif field_name == "buy_partner_name":
+        elif field_name == "giver_partner_name":
             return await show_partner_selection(
                 update, context, 
                 "به چه کسی پرداخت می کنید؟", 
-                CB_SELL_PARTNER, 
-                SELL_PARTNER_NAME
+                CB_RECEIVER_PARTNER, 
+                RECEIVER_PARTNER_NAME 
             )
-        elif field_name == "sell_partner_name":
+        elif field_name == "receiver_partner_name":
             await query.message.reply_text("توضیحات را وارد کنید (اختیاری):")
             return DESCRIPTION
         
@@ -625,8 +625,8 @@ async def amount(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return await show_partner_selection(
             update, context, 
             "از چه کسی دریافت می کنید؟", 
-            CB_BUY_PARTNER, 
-            BUY_PARTNER_NAME
+            CB_GIVER_PARTNER, 
+            GIVER_PARTNER_NAME
         )
 
 async def rate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -646,7 +646,7 @@ async def rate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         PARTNER_NAME
     )
 
-async def buy_partner_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def giver_partner_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Process buy partner name input or show partner selection."""
     # If this is a text message and we were adding a new partner
     if update.message and context.user_data.get("adding_new_partner"):
@@ -655,7 +655,7 @@ async def buy_partner_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             return
         
         new_partner = update.message.text
-        context.user_data["transaction"]["buy_partner_name"] = new_partner
+        context.user_data["transaction"]["giver_partner_name"] = new_partner
         
         # Add the new partner to the sheet
         success = add_partner_name_to_sheet(new_partner)
@@ -669,8 +669,8 @@ async def buy_partner_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return await show_partner_selection(
             update, context, 
             "به چه کسی پرداخت می کنید؟", 
-            CB_SELL_PARTNER, 
-            SELL_PARTNER_NAME
+            CB_RECEIVER_PARTNER, 
+            RECEIVER_PARTNER_NAME
         )
     
     # If this is a fresh request, show partner selection
@@ -680,25 +680,25 @@ async def buy_partner_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             return
             
         # This is a direct text entry without selecting from the list
-        context.user_data["transaction"]["buy_partner_name"] = update.message.text
+        context.user_data["transaction"]["giver_partner_name"] = update.message.text
         
         # Continue to sell partner name
         return await show_partner_selection(
             update, context, 
             "به چه کسی پرداخت می کنید؟", 
-            CB_SELL_PARTNER, 
-            SELL_PARTNER_NAME
+            CB_RECEIVER_PARTNER, 
+            RECEIVER_PARTNER_NAME
         )
     
     # Initial buy partner name request - show selection buttons
     return await show_partner_selection(
         update, context, 
         "از چه کسی دریافت می کنید؟", 
-        CB_BUY_PARTNER, 
-        BUY_PARTNER_NAME
+        CB_GIVER_PARTNER, 
+        GIVER_PARTNER_NAME
     )
 
-async def sell_partner_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def receiver_partner_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Process sell partner name input or show partner selection."""
     # If this is a text message and we were adding a new partner
     if update.message and context.user_data.get("adding_new_partner"):
@@ -707,7 +707,7 @@ async def sell_partner_name(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             return
         
         new_partner = update.message.text
-        context.user_data["transaction"]["sell_partner_name"] = new_partner
+        context.user_data["transaction"]["receiver_partner_name"] = new_partner
         
         # Add the new partner to the sheet
         success = add_partner_name_to_sheet(new_partner)
@@ -728,7 +728,7 @@ async def sell_partner_name(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             return
             
         # This is a direct text entry without selecting from the list
-        context.user_data["transaction"]["sell_partner_name"] = update.message.text
+        context.user_data["transaction"]["receiver_partner_name"] = update.message.text
         
         # Continue to description
         await update.message.reply_text("توضیحات را وارد کنید (اختیاری):")
@@ -738,8 +738,8 @@ async def sell_partner_name(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     return await show_partner_selection(
         update, context, 
         "به چه کسی پرداخت می کنید؟", 
-        CB_SELL_PARTNER, 
-        SELL_PARTNER_NAME
+        CB_RECEIVER_PARTNER, 
+        RECEIVER_PARTNER_NAME
     )
 
 async def description(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -790,11 +790,11 @@ async def show_transaction_summary(update: Update, context: ContextTypes.DEFAULT
     if "rate" in transaction:
         summary += f"نرخ: {transaction['rate']}\n"
     
-    if "buy_partner_name" in transaction:
-        summary += f"طرف خریدار: {transaction['buy_partner_name']}\n"
+    if "giver_partner_name" in transaction:
+        summary += f"طرف پرداخت کننده: {transaction['giver_partner_name']}\n"
     
-    if "sell_partner_name" in transaction:
-        summary += f"طرف فروشنده: {transaction['sell_partner_name']}\n"
+    if "receiver_partner_name" in transaction:
+        summary += f"طرف دریافت کننده: {transaction['receiver_partner_name']}\n"
     
     summary += f"توضیحات: {transaction['description']}\n"
     
@@ -849,8 +849,8 @@ async def confirmation_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 "نوع معامله": transaction.get("deal_type", ""),
                 "مقدار": transaction.get("amount", ""),
                 "نرخ": transaction.get("rate", ""),
-                "طرف خریدار": transaction.get("buy_partner_name", ""),
-                "طرف فروشنده": transaction.get("sell_partner_name", ""),
+                "طرف پرداخت کننده": transaction.get("giver_partner_name", ""),
+                "طرف دریافت کننده": transaction.get("receiver_partner_name", ""),
                 "توضیحات": transaction.get("description", ""),
                 "زمان ثبت": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
@@ -893,7 +893,7 @@ async def confirmation_callback(update: Update, context: ContextTypes.DEFAULT_TY
         elif transaction["type"] == "معامله":
             fields.extend(["جهت معامله", "نوع معامله", "مقدار", "نرخ", "طرف حساب"])
         elif transaction["type"] == "حواله":
-            fields.extend(["نوع معامله", "مقدار", "طرف خریدار", "طرف فروشنده"])
+            fields.extend(["نوع معامله", "مقدار", "طرف پرداخت کننده", "طرف دریافت کننده"])
         
         # Create buttons for each field
         keyboard = []
@@ -1086,21 +1086,21 @@ def main() -> None:
                 MessageHandler(filters.Regex("^(❌ انصراف|🏠 بازگشت به صفحه اصلی)$"), handle_main_menu),
                 MessageHandler(filters.Regex("^🆕 تراکنش جدید$"), new_transaction)
             ],
-            BUY_PARTNER_NAME: [
+            GIVER_PARTNER_NAME: [
                 CallbackQueryHandler(
-                    lambda u, c: handle_partner_selection(u, c, "buy_partner_name"), 
-                    pattern=f"^{CB_BUY_PARTNER}"
+                    lambda u, c: handle_partner_selection(u, c, "giver_partner_name"), 
+                    pattern=f"^{CB_GIVER_PARTNER}"
                 ),
-                MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.Regex("^(❌ انصراف|🏠 بازگشت به صفحه اصلی|🆕 تراکنش جدید)$"), buy_partner_name),
+                MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.Regex("^(❌ انصراف|🏠 بازگشت به صفحه اصلی|🆕 تراکنش جدید)$"), giver_partner_name),
                 MessageHandler(filters.Regex("^(❌ انصراف|🏠 بازگشت به صفحه اصلی)$"), handle_main_menu),
                 MessageHandler(filters.Regex("^🆕 تراکنش جدید$"), new_transaction)
             ],
-             SELL_PARTNER_NAME: [
+            RECEIVER_PARTNER_NAME: [
                 CallbackQueryHandler(
-                    lambda u, c: handle_partner_selection(u, c, "sell_partner_name"), 
-                    pattern=f"^{CB_SELL_PARTNER}"
+                    lambda u, c: handle_partner_selection(u, c, "receiver_partner_name"), 
+                    pattern=f"^{CB_RECEIVER_PARTNER}"
                 ),
-                MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.Regex("^(❌ انصراف|🏠 بازگشت به صفحه اصلی|🆕 تراکنش جدید)$"), sell_partner_name),
+                MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.Regex("^(❌ انصراف|🏠 بازگشت به صفحه اصلی|🆕 تراکنش جدید)$"), receiver_partner_name),
                 MessageHandler(filters.Regex("^(❌ انصراف|🏠 بازگشت به صفحه اصلی)$"), handle_main_menu),
                 MessageHandler(filters.Regex("^🆕 تراکنش جدید$"), new_transaction)
             ],
