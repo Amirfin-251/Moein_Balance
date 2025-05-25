@@ -193,18 +193,23 @@ def add_partner_name_to_sheet(name):
         worksheet = spreadsheet.worksheet("GreenLand")
         
         # Find the "نام مشتری" column
-        # Assuming it's in column D (index 3)
         try:
-            partner_column = worksheet.col_values(4)  # Adjust index if needed
-            
+            # Find the column by header name instead of assuming position
+            headers = worksheet.row_values(1)
+            # Find column index for "نام مشتری"
+            header_index = headers.index("نام مشتری") + 1  # Convert to 1-based index for gspread
+            partner_column = worksheet.col_values(header_index)[1:]
             # Check if name already exists
             if name in partner_column:
                 return False
             
             # Find the first empty cell in the column
-            next_row = len(partner_column) + 1
-            worksheet.update_cell(next_row, 4, name)  # Adjust column index if needed
+            next_row = len(partner_column) + 2  # +2 because col_values skips header and gspread is 1-based
+            worksheet.update_cell(next_row, header_index, name)
             return True
+        except ValueError:
+            logger.error(f"Header 'نام مشتری' not found in worksheet. Available headers: {headers}")
+            return False
         except Exception as e:
             logger.error(f"Error adding partner name: {e}")
             return False
