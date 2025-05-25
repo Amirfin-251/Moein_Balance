@@ -870,12 +870,12 @@ async def confirmation_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 "زمان ثبت": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
             
-            logger.info(f"Sheet headers: {headers}")
+            logger.info(f"Sheet headers: {HEADERS}")
             logger.info(f"Data dict keys: {list(data_dict.keys())}")
             
             # Create a row with values in the correct order based on headers
             row_data = []
-            for header in headers:
+            for header in HEADERS:
                 row_data.append(data_dict.get(header, ""))
             
             # Add to Google Sheets
