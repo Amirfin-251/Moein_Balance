@@ -846,8 +846,9 @@ async def confirmation_callback(update: Update, context: ContextTypes.DEFAULT_TY
             # Open the Google Sheet
             worksheet = setup_google_sheets()
             
-            # Get headers from the first row
-            # headers = worksheet.row_values(1)
+           # Find the next empty row
+            all_values = worksheet.get_all_values()
+            next_row = len(all_values) + 1  # 1-based index for sheets
             
             # Prepare the data as a dictionary
             transaction = context.user_data["transaction"]
@@ -878,9 +879,12 @@ async def confirmation_callback(update: Update, context: ContextTypes.DEFAULT_TY
             for header in HEADERS:
                 row_data.append(data_dict.get(header, ""))
             
-            # Add to Google Sheets
-            worksheet.append_row(row_data)
-            
+            # # Add to Google Sheets
+            # worksheet.append_row(row_data)
+            # Update specific cells in the next empty row (ensure same order as HEADERS)
+            cell_range = f"A{next_row}:P{next_row}"  # A-P covers 16 columns
+            worksheet.update(cell_range, [row_data])
+
             await query.edit_message_text("✅ تراکنش با موفقیت در Google Sheets ذخیره شد!")
             
             # Return to main menu with buttons after successful transaction
