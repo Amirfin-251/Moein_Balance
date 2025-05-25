@@ -66,7 +66,7 @@ FIELD_MAPPING = {
 # Google Sheets setup
 def setup_google_sheets():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        # Check if we're using environment variable for credentials
+    # Check if we're using environment variable for credentials
     if 'GOOGLE_API_KEY' in os.environ:
         import json
         # Parse JSON from environment variable
@@ -89,15 +89,16 @@ def setup_google_sheets():
         worksheet = spreadsheet.worksheet("Transactions")
         # Check if headers exist
         existing_headers = worksheet.row_values(1)
-        if not existing_headers or len(existing_headers) < len(HEADERS):
+        if not existing_headers or existing_headers != HEADERS:
             # Clear first row and add all headers
             if existing_headers:
                 worksheet.delete_row(1)
-            worksheet.insert_row(HEADERS, 1)
+            # Use update to set headers in the first row
+            worksheet.update('A1', [HEADERS])
     except gspread.WorksheetNotFound:
         worksheet = spreadsheet.add_worksheet(title="Transactions", rows=1000, cols=20)
         # Add headers
-        worksheet.insert_row(HEADERS, 1)
+        worksheet.update('A1', [HEADERS])
     
     return worksheet
 
