@@ -960,6 +960,7 @@ async def confirmation_callback(update: Update, context: ContextTypes.DEFAULT_TY
         context.user_data.clear()
         return MAIN_MENU
 
+
 async def edit_field_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Handle edit field selection with appropriate buttons for certain fields."""
     query = update.callback_query
@@ -972,6 +973,30 @@ async def edit_field_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Extract field name from callback data
     field = query.data.replace(CB_EDIT_FIELD, "")
     context.user_data["edit_field"] = field
+
+    # Handle partner fields with inline keyboard
+    if field == "طرف حساب":
+        # Show partner selection for edit
+        return await show_partner_selection(
+            update, context, 
+            "طرف حساب", 
+            CB_PARTNER_NAME, 
+            EDIT_VALUE
+        )
+    elif field == "طرف پرداخت کننده":
+        return await show_partner_selection(
+            update, context, 
+            "از چه کسی دریافت می کنید؟", 
+            CB_GIVER_PARTNER, 
+            EDIT_VALUE
+        )
+    elif field == "طرف دریافت کننده":
+        return await show_partner_selection(
+            update, context, 
+            "به چه کسی پرداخت می کنید؟", 
+            CB_RECEIVER_PARTNER, 
+            EDIT_VALUE
+        )
     
     # Check if this field requires buttons
     if field == "جهت معامله":
@@ -1160,11 +1185,24 @@ def main() -> None:
                 MessageHandler(filters.Regex("^🆕 تراکنش جدید$"), new_transaction)
             ],
             EDIT_VALUE: [
+                # Add these handlers for partner selection in edit mode
+                CallbackQueryHandler(
+                    lambda u, c: handle_partner_selection(u, c, "partner_name"), 
+                    pattern=f"^{CB_PARTNER_NAME}"
+                ),
+                CallbackQueryHandler(
+                    lambda u, c: handle_partner_selection(u, c, "giver_partner_name"), 
+                    pattern=f"^{CB_GIVER_PARTNER}"
+                ),
+                CallbackQueryHandler(
+                    lambda u, c: handle_partner_selection(u, c, "receiver_partner_name"), 
+                    pattern=f"^{CB_RECEIVER_PARTNER}"
+                ),
                 MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.Regex("^(❌ انصراف|🏠 بازگشت به صفحه اصلی|🆕 تراکنش جدید)$"), edit_value),
                 MessageHandler(filters.Regex("^(❌ انصراف|🏠 بازگشت به صفحه اصلی)$"), handle_main_menu),
                 MessageHandler(filters.Regex("^🆕 تراکنش جدید$"), new_transaction)
             ],
-        },
+                    },
         fallbacks=[CommandHandler("cancel", cancel_from_any_state)],
         allow_reentry=True
     )
