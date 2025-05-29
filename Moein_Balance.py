@@ -873,7 +873,23 @@ async def confirmation_callback(update: Update, context: ContextTypes.DEFAULT_TY
             
             logger.info(f"Sheet headers: {HEADERS}")
             logger.info(f"Data dict keys: {list(data_dict.keys())}")
-            
+            # Convert numeric fields to numbers if possible
+            numeric_fields = [
+                "شماره سند", "شماره پاکت", "عیار", "وزن", "مقدار", "نرخ"
+            ]
+            for field in numeric_fields:
+                value = data_dict.get(field, "")
+                if isinstance(value, str) and value.strip() != "":
+                    try:
+                        # Try to convert to int first, then fall back to float if necessary
+                        num = int(value.replace(",", ""))
+                    except ValueError:
+                        try:
+                            num = float(value.replace(",", ""))
+                        except ValueError:
+                            num = value  # Leave as is if conversion fails
+                    data_dict[field] = num
+
             # Create a row with values in the correct order based on headers
             row_data = []
             for header in HEADERS:
